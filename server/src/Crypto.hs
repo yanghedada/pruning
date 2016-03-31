@@ -18,5 +18,7 @@ rsaEncrypt = id
 rsaDecrypt :: ByteString -> ByteString
 rsaDecrypt = id
 
+-- generate aes key used for encryption
+-- from username and password
 generateAesKey :: Text -> Text -> Token
 generateAesKey t1 t2 = t1 <> t2
