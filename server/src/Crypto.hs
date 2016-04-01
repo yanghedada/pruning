@@ -2,7 +2,8 @@ module Crypto where
 
 import Data.ByteString (ByteString)
 import Data.Monoid
-import Data.Text (Text)
+import Data.Text (Text, pack)
+import System.Random
 
 import Types
 
@@ -22,3 +23,11 @@ rsaDecrypt = id
 -- from username and password
 generateAesKey :: Text -> Text -> Token
 generateAesKey t1 t2 = t1 <> t2
+
+genRandomToken' :: Int -> IO Token
+genRandomToken' n = do
+    gen <- newStdGen
+    return . pack . take n $ randomRs ('A', 'Z') gen
+
+genRandomToken :: IO Token
+genRandomToken = genRandomToken' 32

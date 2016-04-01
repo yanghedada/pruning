@@ -2,24 +2,33 @@
 module Main where
 
 import Network.WebSockets
+import Database.Persist
+import Database.Persist.Sql
+import Database.Persist.TH
+import Database.Persist.Sqlite
+import Control.Concurrent
+import Data.HashMap.Lazy
 
 import Api
+import Database
+import Constant
+import Types
 
-app :: ServerApp
-app pend = do
+app :: MVar MessagePool -> ServerApp
+app mp pend = do
     case (requestPath $ pendingRequest pend) of
         "/register" -> do
             conn <- acceptRequest pend
             appRegister conn
         "/login" -> do
             conn <- acceptRequest pend
-            appLogin conn
+            appLogin mp conn
         "/post" -> do
             conn <- acceptRequest pend
-            appPost conn
+            appPost mp conn
         "/logout" -> do
             conn <- acceptRequest pend
-            appLogout conn
+            appLogout mp conn
         "/sync" -> do
             conn <- acceptRequest pend
             appSync conn
@@ -27,4 +36,6 @@ app pend = do
 
 main :: IO ()
 main = do
-    runServer "0.0.0.0" 4564 app
+    runSqlite sqlTable (runMigration migrateAll)
+    msgPool <- newMVar (empty :: MessagePool)
+    runServer "0.0.0.0" 4564 $ app msgPool
