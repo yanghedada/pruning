@@ -37,6 +37,13 @@ data JSync = JSync {
 
 instance FromJSON JSync
 
+data JSyncAck = JSyncAck {
+    jsamsgid :: Text,
+    jsastatus :: Text
+} deriving (Show, Generic)
+
+instance FromJSON JSyncAck
+
 data JLogout = JLogout {
     jltoken :: Text
     -- TODO: reason :: Text

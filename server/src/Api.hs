@@ -37,6 +37,9 @@ respondLogoutMessage = respondRegisterMessage
 respondPostMessage :: Connection -> Scientific -> Text -> IO ()
 respondPostMessage = respondRegisterMessage
 
+respondSyncErrorMessage :: Connection -> Scientific -> Text -> IO ()
+respondSyncErrorMessage = respondRegisterMessage
+
 appRegister :: Connection -> IO ()
 appRegister conn = do
     jregister <- receiveData conn >>= return . decode
@@ -70,6 +73,8 @@ performLoginAction conn jl msgp = do
         Just (Entity uid _) -> do
             tok <- genRandomToken
             b <- insertTokenDb tok uid msgp
+            mp <- readMVar msgp
+            print mp
             if b then respondLoginMessage conn 200 "" tok else
                         respondLoginMessage conn 422 sqlErrorStr ""
         Nothing -> respondLoginMessage conn 422 "username / password mismatch" ""
@@ -100,17 +105,17 @@ performPostAction conn jp msgp = do
     mtokenMap <- runSqlite sqlTable $ selectFirst [TokenMapToken ==. jptoken jp] []
     case mtokenMap of
         Just (Entity _ tokenmap) -> do
-            addMessageToToken (tokenMapUser tokenmap) (jpdata jp) msgp
+            addMessageToToken (tokenMapUser tokenmap) (jptoken jp) (jpdata jp) msgp
             respondPostMessage conn 200 ""
         Nothing -> respondPostMessage conn 422 "no such token"
 
-addMessageToToken :: Key User -> Text -> MVar MessagePool -> IO ()
-addMessageToToken uid msg msgp = do
+addMessageToToken :: Key User -> Token -> Text -> MVar MessagePool -> IO ()
+addMessageToToken uid token msg msgp = do
     midmap <- runSqlite sqlTable $ selectFirst [IdMapUser ==. uid] []
     case midmap of
         Nothing -> error "OMG!!! BUGS!" -- this should not happen
         Just (Entity _ (IdMap _ toks)) -> do
-            forM_ toks (\tok ->
+            forM_ (L.delete token toks) (\tok ->
                 modifyMVar_ msgp (\m -> return $ HM.adjust (++[msg]) tok m))
 
 appLogout :: MVar MessagePool -> Connection -> IO ()
@@ -143,5 +148,31 @@ deleteTokenDb tok uid msgp = do
                             return True) handler where
                         handler (SomeException _) = return False
 
-appSync :: Connection -> IO ()
-appSync = undefined
+appSync :: MVar MessagePool -> Connection -> IO ()
+appSync msgp conn = do
+    jsync <- receiveData conn >>= return . decode
+    case jsync of
+        Nothing -> respondSyncErrorMessage conn 400 "bad request"
+        Just js -> do
+            mp <- readMVar msgp
+            if (jstoken js) `HM.member` mp then 
+                sendMessagesOfToken (jstoken js) msgp conn
+            else respondSyncErrorMessage conn 422 "no such token"
+
+sendMessagesOfToken :: Token -> MVar MessagePool -> Connection -> IO ()
+sendMessagesOfToken token msgp conn = do
+    mp <- readMVar msgp
+    let msgs = HM.lookupDefault (error "BUG!!!") token mp
+    if null msgs then sendMessagesOfToken token msgp conn else do
+        msgid <- genRandomMsgId
+        let obj = object [ "msg" .= String (head msgs), "msgid" .= String msgid ]
+        sendTextData conn (encode obj)
+        jsa' <- receiveData conn >>= return . decode
+        case jsa' of
+            Just jsa ->
+                if (jsamsgid jsa == msgid) && (jsastatus jsa) == "ok" then do
+                    modifyMVar_ msgp (\m -> return $ HM.adjust tail token m)
+                    sendMessagesOfToken token msgp conn else
+                        sendMessagesOfToken token msgp conn
+            Nothing -> respondSyncErrorMessage conn 400
+                "you don't know how to respond to my message!"

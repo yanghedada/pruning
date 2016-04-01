@@ -31,7 +31,7 @@ app mp pend = do
             appLogout mp conn
         "/sync" -> do
             conn <- acceptRequest pend
-            appSync conn
+            appSync mp conn
         _ -> rejectRequest pend ""
 
 main :: IO ()

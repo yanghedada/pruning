@@ -1,12 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Client where
 import Network.WebSockets
 import Data.Aeson
 import Data.Text.IO as TIO
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.Text as T
+import GHC.Generics
 
 type Token = T.Text
+
+data MSG = MSG {
+    msg :: T.Text,
+    msgid :: T.Text
+} deriving (Generic)
+
+instance FromJSON MSG
 
 serverIP :: String
 serverIP = "127.0.0.1"
@@ -54,3 +63,21 @@ appPost tok msg conn = do
 
 exePost :: Token -> T.Text -> IO ()
 exePost tok msg = runClient serverIP serverPort "/post" $ appPost tok msg
+
+appSync :: Token -> ClientApp ()
+appSync tok conn = do
+    sendTextData conn (encode v)
+    syncLoop conn where
+        v = object ["jstoken" .= tok]
+
+syncLoop :: Connection -> IO ()
+syncLoop conn = do
+    msg <- receiveData conn
+    LBS.putStrLn msg
+    let Just m = decode msg
+        v = object ["jsamsgid" .= String (msgid m), "jsastatus" .= String "ok"]
+    sendTextData conn (encode v)
+    syncLoop conn
+
+exeSync :: Token -> IO ()
+exeSync token = runClient serverIP serverPort "/sync" $ appSync token

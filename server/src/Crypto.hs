@@ -31,3 +31,6 @@ genRandomToken' n = do
 
 genRandomToken :: IO Token
 genRandomToken = genRandomToken' 32
+
+genRandomMsgId :: IO Text
+genRandomMsgId = genRandomToken' 32
