@@ -14,6 +14,8 @@ import qualified Data.List as L
 import Control.Concurrent
 import qualified Data.HashMap.Lazy as HM
 import Control.Monad.IO.Class (liftIO)
+import System.Timeout
+import Data.Maybe (fromJust)
 
 import Crypto
 import JSON
@@ -42,13 +44,13 @@ respondSyncErrorMessage = respondRegisterMessage
 
 appRegister :: Connection -> IO ()
 appRegister conn = do
-    jregister <- receiveData conn >>= return . decode
+    jregister <- liftM decode $ receiveData conn
     case jregister of
         Just jr -> performRegisterAction conn jr
         Nothing -> respondRegisterMessage conn 400 "bad request"
 
 performRegisterAction :: Connection -> JRegister -> IO ()
-performRegisterAction conn jr = do
+performRegisterAction conn jr =
     catch (do
         runSqlite sqlTable $ insert $ User u p key
         respondRegisterMessage conn 200 "") handler where
@@ -60,7 +62,7 @@ performRegisterAction conn jr = do
 
 appLogin :: MVar MessagePool -> Connection -> IO ()
 appLogin msgp conn = do
-    jlogin <- receiveData conn >>= return . decode
+    jlogin <- liftM decode $ receiveData conn
     case jlogin of
         Just jl -> performLoginAction conn jl msgp
         Nothing -> respondLoginMessage conn 400 "bad request" ""
@@ -81,21 +83,21 @@ performLoginAction conn jl msgp = do
 
 insertTokenDb :: Token -> Key User -> MVar MessagePool -> IO Bool
 insertTokenDb tok uid msgp =
-    catch (do
+    catch (
         runSqlite sqlTable $ do
             insert $ TokenMap tok uid
             ts <- selectFirst [IdMapUser ==. uid] []
             case ts of
-                Nothing -> do
+                Nothing ->
                     void $ insert $ IdMap uid [tok]
                 Just (Entity rid (IdMap _ tks)) -> update rid [IdMapTokens =. (tok:tks)]
-            liftIO $ modifyMVar_ msgp (\m -> return $ HM.insert tok [] m)
+            liftIO $ modifyMVar_ msgp (return . HM.insert tok [])
             return True) handler where
                 handler (SomeException _) = return False
 
 appPost :: MVar MessagePool -> Connection -> IO ()
 appPost msgPool conn = do
-    jpost <- receiveData conn >>= return . decode
+    jpost <- liftM decode $ receiveData conn
     case jpost of
         Just jp -> performPostAction conn jp msgPool
         Nothing -> respondPostMessage conn 400 "bad request"
@@ -114,13 +116,13 @@ addMessageToToken uid token msg msgp = do
     midmap <- runSqlite sqlTable $ selectFirst [IdMapUser ==. uid] []
     case midmap of
         Nothing -> error "OMG!!! BUGS!" -- this should not happen
-        Just (Entity _ (IdMap _ toks)) -> do
+        Just (Entity _ (IdMap _ toks)) ->
             forM_ (L.delete token toks) (\tok ->
-                modifyMVar_ msgp (\m -> return $ HM.adjust (++[msg]) tok m))
+                modifyMVar_ msgp (return . HM.adjust (++[msg]) tok))
 
 appLogout :: MVar MessagePool -> Connection -> IO ()
 appLogout msgp conn = do
-    jlogout <- receiveData conn >>= return . decode
+    jlogout <- liftM decode $ receiveData conn
     case jlogout of
         Just jl -> performLogoutAction conn jl msgp
         Nothing -> respondLogoutMessage conn 400 "bad request"
@@ -136,43 +138,53 @@ performLogoutAction conn jl msgp = do
         Nothing -> respondLogoutMessage conn 422 "no such token"
 
 deleteTokenDb :: Token -> Key User -> MVar MessagePool -> IO Bool
-deleteTokenDb tok uid msgp = do
+deleteTokenDb tok uid msgp =
     catch (runSqlite sqlTable $ do
-        deleteWhere $ [TokenMapToken ==. tok]
+        deleteWhere [TokenMapToken ==. tok]
         ts <- selectFirst [IdMapUser ==. uid] []
         case ts of
             Nothing -> return False -- if this happens, we have severe bug(s)
             Just (Entity rid (IdMap _ tks)) -> do
                             update rid [IdMapTokens =. L.delete tok tks]
-                            liftIO $ modifyMVar_ msgp (\m -> return $ HM.delete tok m)
+                            liftIO $ modifyMVar_ msgp (return . HM.delete tok)
                             return True) handler where
                         handler (SomeException _) = return False
 
 appSync :: MVar MessagePool -> Connection -> IO ()
 appSync msgp conn = do
-    jsync <- receiveData conn >>= return . decode
+    jsync <- liftM decode $ receiveData conn
     case jsync of
         Nothing -> respondSyncErrorMessage conn 400 "bad request"
         Just js -> do
             mp <- readMVar msgp
-            if (jstoken js) `HM.member` mp then 
+            if jstoken js `HM.member` mp then 
                 sendMessagesOfToken (jstoken js) msgp conn
             else respondSyncErrorMessage conn 422 "no such token"
 
 sendMessagesOfToken :: Token -> MVar MessagePool -> Connection -> IO ()
 sendMessagesOfToken token msgp conn = do
     mp <- readMVar msgp
-    let msgs = HM.lookupDefault (error "BUG!!!") token mp
-    if null msgs then sendMessagesOfToken token msgp conn else do
-        msgid <- genRandomMsgId
-        let obj = object [ "msg" .= String (head msgs), "msgid" .= String msgid ]
-        sendTextData conn (encode obj)
-        jsa' <- receiveData conn >>= return . decode
-        case jsa' of
-            Just jsa ->
-                if (jsamsgid jsa == msgid) && (jsastatus jsa) == "ok" then do
-                    modifyMVar_ msgp (\m -> return $ HM.adjust tail token m)
-                    sendMessagesOfToken token msgp conn else
-                        sendMessagesOfToken token msgp conn
-            Nothing -> respondSyncErrorMessage conn 400
-                "you don't know how to respond to my message!"
+    let handler (PatternMatchFail _) = return Nothing
+    msgs' <- catch (return $ HM.lookup token mp) handler
+    case msgs' of
+        Nothing -> return ()
+        Just msgs ->
+            if null msgs then do
+                threadDelay 500000
+                sendMessagesOfToken token msgp conn
+            else do
+            msgid <- genRandomMsgId
+            let obj = object [ "msg" .= String (head msgs),
+                                "msgid" .= String msgid ]
+            sendTextData conn (encode obj)
+            jsa' <- timeout 3000000 $ liftM decode $ receiveData conn
+            case jsa' of
+                Just (Just jsa) ->
+                    if jsamsgid jsa == msgid && jsastatus jsa == "ok" then do
+                        modifyMVar_ msgp (return . HM.adjust tail token)
+                        sendMessagesOfToken token msgp conn else
+                            sendMessagesOfToken token msgp conn
+                Just Nothing -> respondSyncErrorMessage conn 400
+                    "you don't know how to respond to my message!"
+                Nothing -> return ()
+

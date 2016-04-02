@@ -7,7 +7,8 @@ import Database.Persist.Sql
 import Database.Persist.TH
 import Database.Persist.Sqlite
 import Control.Concurrent
-import Data.HashMap.Lazy
+import Control.Monad
+import Data.HashMap.Lazy as HM
 
 import Api
 import Database
@@ -38,4 +39,8 @@ main :: IO ()
 main = do
     runSqlite sqlTable (runMigration migrateAll)
     msgPool <- newMVar (empty :: MessagePool)
+    results <- runSqlite sqlTable $ selectList ([] :: [Filter TokenMap]) []
+    forM_ results $ \(Entity _ val) -> do
+        let t = tokenMapToken val
+        modifyMVar_ msgPool (return . HM.insert t [])
     runServer "0.0.0.0" 4564 $ app msgPool
