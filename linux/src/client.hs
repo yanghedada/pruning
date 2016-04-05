@@ -18,7 +18,8 @@ data MSG = MSG {
 instance FromJSON MSG
 
 serverIP :: String
-serverIP = "127.0.0.1"
+serverIP = "162.211.226.148"
+--serverIP = "127.0.0.1"
 
 serverPort :: Int
 serverPort = 4564
@@ -67,6 +68,7 @@ exePost tok msg = runClient serverIP serverPort "/post" $ appPost tok msg
 appSync :: Token -> ClientApp ()
 appSync tok conn = do
     sendTextData conn (encode v)
+    forkPingThread conn 300
     syncLoop conn where
         v = object ["jstoken" .= tok]
 
