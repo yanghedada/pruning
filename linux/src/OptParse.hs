@@ -22,9 +22,12 @@ import Util
 import Types
 import Api
 
-initParser :: Parser (Maybe ConfigFile)
-initParser = optional $ helper <*> strOption (short 'c' <> long "config"
+configOption :: Parser (Maybe FilePath)
+configOption = optional $ strOption (short 'c' <> long "config"
                 <> metavar "file" <> help "Specify config file")
+
+initParser :: Parser (Maybe ConfigFile)
+initParser = helper <*> configOption
 
 initCmd :: Maybe FilePath -> IO ()
 initCmd fp = do
@@ -49,14 +52,22 @@ getSetting conf =
             ext <- doesFileExist conf
             if ext then do
                 putStrLn "The config file is invalid"
-                error . show $ e else
+                error . show $ e else do
+                error . show $ e
                 error "Have you run \ESC[1;33m\"init\"\ESC[0m first?"
+
+getConfig :: Maybe FilePath -> IO (FilePath, Configuration)
+getConfig conf = do
+    let c = case conf of
+                Nothing -> configFile
+                Just c' -> c'
+    config <- getSetting c
+    return (c, config)
 
 registerParser :: Parser RegisterOpts
 registerParser = helper <*> ((,) <$> username <*> configfile) where
     username = optional $ strArgument (metavar "USERNAME")
-    configfile = optional $ strOption (short 'c' <> long "config"
-                            <> metavar "file" <> help "Specify config file")
+    configfile = configOption 
 
 getRegPassword :: IO String
 getRegPassword = do
@@ -70,10 +81,7 @@ getRegPassword = do
 
 registerCmd :: RegisterOpts -> IO ()
 registerCmd (u, c) = do
-    let conf = case c of
-                Nothing -> configFile
-                Just c' -> c'
-    config <- getSetting conf
+    (conf, config) <- getConfig c
     let user = case u of
                 Nothing -> config ^. userInfoL . usernameL
                 Just u' -> u'
@@ -81,20 +89,14 @@ registerCmd (u, c) = do
     putStrLn $ "registering as user: " ++ user
     pwd <- getRegPassword
     resp <- exeRegister newconfig (T.pack pwd)
-    if resp ^?! key "code" . _Number == 200 then
-        putStrLn "Register successfully" >> BS.writeFile conf (Y.encode newconfig)
-        else T.putStrLn $
-            "Register failed, the server responded: " <> resp ^. key "msg" . _String
+    processResp resp "Register" $  BS.writeFile conf (Y.encode newconfig)
 
 loginParser :: Parser LoginOpts
 loginParser = registerParser
 
 loginCmd :: LoginOpts -> IO ()
 loginCmd (u, c) = do
-    let conf = case c of
-                Nothing -> configFile
-                Just c' -> c'
-    config <- getSetting conf
+    (conf, config) <- getConfig c
     let user = case u of
                 Nothing -> config ^. userInfoL . usernameL
                 Just u' -> u'
@@ -102,12 +104,9 @@ loginCmd (u, c) = do
     putStrLn $ "login as user: " ++ user
     pwd <- askForPassword "enter the password: "
     resp <- exeLogin newconfig (T.pack pwd)
-    if resp ^?! key "code" . _Number == 200 then do
-        putStrLn "Login successfully"
+    processResp resp "Login" $ do
         storeToken newconfig resp
-        BS.writeFile conf (Y.encode newconfig) 
-        else T.putStrLn $
-            "Login failed, the server responded: " <> resp ^. key "msg" . _String
+        BS.writeFile conf (Y.encode newconfig)
 
 storeToken :: Configuration -> LBS.ByteString -> IO ()
 storeToken conf resp = do
@@ -117,31 +116,65 @@ storeToken conf resp = do
     createDirectoryIfMissing True storedir
     T.writeFile cacheFile $ tokenToCache (conf ^. userInfoL . usernameL) token
 
-tokenToCache :: String -> T.Text -> T.Text
-tokenToCache username token = T.pack username <> "\n" <> token
-
-cacheToToken :: T.Text -> (String, T.Text)
-cacheToToken text =
-    let (u:t) = T.lines text
-    in (T.unpack u, T.concat t)
-
 logoutParser :: Parser LogoutOpts
-logoutParser = helper <*> (optional $ strOption (long "config" <> short 'c' 
-    <> metavar "file" <> help "Specify config file"))
+logoutParser = helper <*> configOption
 
 logoutCmd :: LogoutOpts -> IO ()
 logoutCmd c = do
-    let conf = case c of
-                Nothing -> configFile
-                Just c' -> c'
-    config <- getSetting conf
-    let storedir = config ^. storeInfoL . storeDirL
-        cacheFile = storedir </> cacheFileName
-    (_, tok) <- cacheToToken <$> T.readFile cacheFile
+    (_, config) <- getConfig c
+    tok <- getTokenFromConfig config
     resp <- exeLogout config tok
-    if resp ^?! key "code" . _Number == 200 then do
-        putStrLn "Logout successfully"
-        removeFile cacheFile else T.putStrLn $
-        "Logout failed, the server responded: " <> resp ^. key "msg" . _String
+    processResp resp "Logout" $ removeFile (getCacheFileFromConfig config)
 
+postParser :: Parser PostOpts
+postParser = helper <*> ((,,) <$> configfile <*> postfile <*> postdata) where
+        configfile = configOption
+        postfile = optional $ strOption (short 'f' <> long "file"
+                    <> metavar "post_file" <> help "Specify file to post, \
+                    \this has precedence over argument STRING")
+        postdata = optional $ strArgument (metavar "STRING")
+
+postCmd :: PostOpts -> IO ()
+postCmd (c, f, d) = do
+    (_, config) <- getConfig c
+    tok <- getTokenFromConfig config
+    case f of
+        Just f' -> sendFile config tok f'
+        Nothing -> case d of
+                    Nothing -> putStrLn "Nothing to do"
+                    Just str -> sendString config tok str
+
+sendFile :: Configuration -> Token -> FilePath -> IO ()
+sendFile conf token fp = readFile fp >>= sendString conf token
+
+sendString :: Configuration -> Token -> String -> IO ()
+sendString conf tok msg = do
+    resp <- exePost conf tok (T.pack msg)
+    processResp resp "Post" (return ())
+
+processResp :: LBS.ByteString -> String -> IO () -> IO ()
+processResp resp prefix action = do
+    if resp ^?! key "code" . _Number == 200 then do
+        putStrLn $ prefix ++ " successfully"
+        action else T.putStrLn $
+            (T.pack prefix) <> " failed, the server responded: "
+                <> resp ^. key "msg" . _String
+
+statusParser :: Parser StatusOpts
+statusParser = helper <*> configOption
+
+statusCmd :: StatusOpts -> IO ()
+statusCmd c = do
+    (_, config) <- getConfig c
+    b <- doesFileExist (getCacheFileFromConfig config)
+    if b then putStrLn "Seems like you have already logged in" else
+            putStrLn "Seems like you have not logged in yet"
+
+daemonParser :: Parser DaemonOpts
+daemonParser = helper <*> configOption
+
+daemonCmd :: DaemonOpts -> IO ()
+daemonCmd c = do
+    (_, config) <- getConfig c
+    exeSync config
 

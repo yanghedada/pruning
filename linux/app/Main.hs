@@ -6,11 +6,12 @@ main :: IO ()
 main = do
     (opts,runCmd) <-
         simpleOptions "Version 0.1.0.0"
-                      "cliperc - Cliper Tool client executable"
-                      "Run init command when using for first time"
+                      "cliper - Cliper Tool client executable"
+                      "Run init command when using for the first time"
                       (pure ()) $
         do addCommand "init"
-                      "Init everything, and generate a config file (default under $HOME directory)"
+                      "Init everything, and generate a config file \
+                      \(default under $HOME directory)"
                       initCmd
                       initParser
            addCommand "register"
@@ -23,10 +24,18 @@ main = do
                       loginParser
            addCommand "post"
                       "Post data to the server"
-                      (const undefined)
-                      (pure ())
+                      postCmd
+                      postParser
            addCommand "logout"
                       "Logout (erase token)"
                       logoutCmd
                       logoutParser
+           addCommand "status"
+                      "Check if you have logged in"
+                      statusCmd
+                      statusParser
+           addCommand "daemon"
+                      "The Ultimate Power of Evil Dark"
+                      daemonCmd
+                      daemonParser
     runCmd

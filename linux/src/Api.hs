@@ -8,10 +8,17 @@ import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.Text as T
 import GHC.Generics
 import Control.Lens ((^.))
+import Control.Concurrent
+import Control.Exception
+import System.IO.Error
+import Data.Text.Encoding (encodeUtf8)
+import Data.Aeson.Lens (key, _String)
+import Data.Monoid
+import System.IO
 
 import Types
+import Util
 
-type Token = T.Text
 
 data MSG = MSG {
     msg :: T.Text,
@@ -19,6 +26,13 @@ data MSG = MSG {
 } deriving (Generic)
 
 instance FromJSON MSG
+
+--                           ip     port  username devicename
+getInfo :: Configuration -> (String, Int, T.Text, T.Text)
+getInfo conf = (conf ^. serverInfoL . serverIPL,
+                conf ^. serverInfoL . serverPortL,
+                T.pack $ conf ^. userInfoL . usernameL,
+                T.pack $ conf ^. userInfoL . usernameL)
 
 appRegister :: T.Text -> T.Text -> ClientApp LBS.ByteString
 appRegister u p conn = do
@@ -28,9 +42,7 @@ appRegister u p conn = do
 
 exeRegister :: Configuration -> T.Text -> IO LBS.ByteString
 exeRegister conf p = do
-    let ip = conf ^. serverInfoL . serverIPL
-        port = conf ^. serverInfoL . serverPortL
-        u = T.pack $ conf ^. userInfoL . usernameL
+    let (ip, port, u, _) = getInfo conf
     runClient ip port "/register" $ appRegister u p
 
 appLogin :: T.Text -> T.Text -> T.Text -> ClientApp LBS.ByteString
@@ -42,10 +54,7 @@ appLogin u p d conn = do
 
 exeLogin :: Configuration -> T.Text -> IO LBS.ByteString
 exeLogin conf p = do
-    let ip = conf ^. serverInfoL . serverIPL
-        port = conf ^. serverInfoL . serverPortL
-        u = T.pack $ conf ^. userInfoL . usernameL
-        d = T.pack $ conf ^. userInfoL . devicenameL
+    let (ip, port, u, d) = getInfo conf
     runClient ip port "/login" $ appLogin u p d
 
 appLogout :: Token -> ClientApp LBS.ByteString
@@ -56,35 +65,63 @@ appLogout tok conn = do
 
 exeLogout :: Configuration -> Token -> IO LBS.ByteString
 exeLogout conf tok = do
-    let ip = conf ^. serverInfoL . serverIPL
-        port = conf ^. serverInfoL . serverPortL
+    let (ip, port, _, _) = getInfo conf
     runClient ip port "/logout" $ appLogout tok
 
-{-appPost :: Token -> T.Text -> ClientApp ()-}
-{-appPost tok msg conn = do-}
-    {-sendTextData conn (encode v)-}
-    {-msg <- receiveData conn-}
-    {-TIO.putStrLn msg where-}
-        {-v = object ["jptoken" .= tok, "jpdata" .= msg]-}
+appPost :: Token -> T.Text -> ClientApp LBS.ByteString
+appPost tok msg conn = do
+    sendTextData conn (encode v)
+    receiveData conn where
+        v = object ["jptoken" .= tok, "jpdata" .= msg]
 
-{-exePost :: Token -> T.Text -> IO ()-}
-{-exePost tok msg = runClient serverIP serverPort "/post" $ appPost tok msg-}
+exePost :: Configuration -> Token -> T.Text -> IO LBS.ByteString
+exePost conf tok msg = do
+    let (ip, port, _, _) = getInfo conf
+    runClient ip port "/post" $ appPost tok msg
 
-{-appSync :: Token -> ClientApp ()-}
-{-appSync tok conn = do-}
-    {-sendTextData conn (encode v)-}
-    {-forkPingThread conn 300-}
-    {-syncLoop conn where-}
-        {-v = object ["jstoken" .= tok]-}
+appSync :: Configuration -> ClientApp ()
+appSync conf conn = do
+    tok <- getTokenFromConfig conf
+    TIO.putStrLn tok
+    let log = getLogFileFromConfig conf
+        v = object ["jstoken" .= tok]
+    sendTextData conn (encode v)
+    tid <- forkIO $ syncLoop conn log
+    pingLoop conn 10 tid conf
 
-{-syncLoop :: Connection -> IO ()-}
-{-syncLoop conn = do-}
-    {-msg <- receiveData conn-}
-    {-LBS.putStrLn msg-}
-    {-let Just m = decode msg-}
-        {-v = object ["jsamsgid" .= String (msgid m), "jsastatus" .= String "ok"]-}
-    {-sendTextData conn (encode v)-}
-    {-syncLoop conn-}
+pingLoop :: Connection -> Int -> ThreadId -> Configuration -> IO ()
+pingLoop conn n tid conf = do
+    result <- try $ sendPing conn ("ping"::LBS.ByteString)
+    case result of
+        Left (SomeException e) -> do
+            killThread tid
+            Prelude.putStrLn "connection issue..., will retry in 1 minutes"
+            threadDelay 6000000
+            exeSync conf
+        Right _ -> do
+            threadDelay (n * 1000000) -- default 5 min
+            pingLoop conn n tid conf
 
-{-exeSync :: Token -> IO ()-}
-{-exeSync token = runClient serverIP serverPort "/sync" $ appSync token-}
+syncLoop :: Connection -> FilePath -> IO ()
+syncLoop conn log = do
+    msg <- receiveData conn
+    let msg' = LBS.fromStrict . encodeUtf8 $ msg ^. key "msg" . _String <> "\n"
+        Just m = decode msg
+        v = object ["jsamsgid" .= String (msgid m), "jsastatus" .= String "ok"]
+    LBS.appendFile log msg'
+    forkIO $ setClipboard $ LBS.unpack msg'
+    catch (sendTextData conn (encode v)) handler
+    syncLoop conn log where
+        handler :: SomeException -> IO ()
+        handler _ = error "this should be very very rare, what happened???"
+
+exeSync :: Configuration -> IO ()
+exeSync conf = do
+    let (ip, port, _, _) = getInfo conf
+        log = getLogFileFromConfig conf
+    catch (runClient ip port "/sync" $ appSync conf) handler where
+        handler :: ConnectionException -> IO ()
+        handler _ = do
+                TIO.hPutStrLn stderr "establishing connection failed... retry in 60 s"
+                threadDelay 6000000
+                exeSync conf

@@ -1,0 +1,8 @@
+userInfo:
+  username: test
+  devicename: 4.4.5-1-ARCH
+serverInfo:
+  serverPort: 4564
+  serverIP: '162.211.226.148'
+storeInfo:
+  storeDir: /tmp

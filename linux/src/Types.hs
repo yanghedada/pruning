@@ -5,6 +5,8 @@ module Types where
 import GHC.Generics
 import Data.Yaml
 import Control.Lens
+import Data.Text (Text)
+
 import Lens
 
 data ServerInfo = ServerI {
@@ -48,3 +50,10 @@ type ConfigFile = FilePath
 type RegisterOpts = (Maybe Username, Maybe ConfigFile)
 type LoginOpts = RegisterOpts
 type LogoutOpts = Maybe ConfigFile
+--                      config      file to post    just string
+type PostOpts = (Maybe ConfigFile, Maybe FilePath, Maybe String)
+type StatusOpts = Maybe ConfigFile
+
+type DaemonOpts = Maybe ConfigFile
+
+type Token = Text

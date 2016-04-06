@@ -17,7 +17,7 @@ configFile' :: FilePath
 configFile' = "." ++ toolName ++ ".yaml"
 
 configFile :: FilePath
-configFile = unsafePerformIO $ (</> configFile') <$> getHomeDirectory
+configFile =  unsafePerformIO $ (</> configFile') <$> getHomeDirectory
 
 defaultServerIP :: String
 defaultServerIP = "162.211.226.148"
@@ -33,3 +33,6 @@ defaultStoreDir = unsafePerformIO $ (</> storeDir') <$> getHomeDirectory
 
 cacheFileName :: FilePath
 cacheFileName = ".cache"
+
+logFileName :: FilePath
+logFileName = "message.log"

@@ -1,0 +1,10 @@
+[Unit]
+Description=Cliper Daemon Service
+After=network.target
+
+[Service]
+ExecStop=/usr/bin/killall cliper
+ExecStart=/usr/bin/cliper daemon -c /home/adv_zxy/.cliper.yaml
+
+[Install]
+WantedBy=default.target
