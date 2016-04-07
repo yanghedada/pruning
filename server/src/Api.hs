@@ -161,9 +161,15 @@ appSync msgp conn = do
         Nothing -> respondSyncErrorMessage conn 400 "bad request"
         Just js -> do
             mp <- readMVar msgp
-            if jstoken js `HM.member` mp then 
+            if jstoken js `HM.member` mp then do
+                forkIO $ keepAlive conn
                 sendMessagesOfToken (jstoken js) msgp conn
             else respondSyncErrorMessage conn 422 "no such token"
+
+keepAlive :: Connection -> IO ()
+keepAlive conn = do
+    (receiveData conn :: IO Text) >>= sendTextData conn
+    keepAlive conn
 
 sendMessagesOfToken :: Token -> MVar MessagePool -> Connection -> IO ()
 sendMessagesOfToken token msgp conn = do
