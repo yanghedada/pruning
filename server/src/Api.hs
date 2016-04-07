@@ -169,9 +169,8 @@ appPing :: Connection -> IO ()
 appPing = keepAlive
 
 keepAlive :: Connection -> IO ()
-keepAlive conn = do
+keepAlive conn =
     (receiveData conn :: IO Text) >>= sendTextData conn
-    keepAlive conn
 
 sendMessagesOfToken :: Token -> MVar MessagePool -> Connection -> IO ()
 sendMessagesOfToken token msgp conn = do
