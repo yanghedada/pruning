@@ -70,20 +70,20 @@ getLogFileFromConfig conf =
     let u = conf ^. userInfoL . usernameL
     in conf ^. storeInfoL . storeDirL </> (u <> "_" <> logFileName)
 
-setClipboard :: String -> IO ()
+setClipboard :: T.Text -> IO ()
 setClipboard msg = do
     (stdIn, _, _, _) <- 
         createProcess (shell "xclip -selection clipboard") {std_in = CreatePipe}
     case stdIn of
         Just i -> do
-            hPutStr i msg
+            T.hPutStr i msg
             hClose i
         Nothing -> putStrLn "fail to set clipboard content"
 
 processResp :: LBS.ByteString -> String -> IO () -> IO ()
-processResp resp prefix action = do
+processResp resp prefix action =
     if resp ^?! key "code" . _Number == 200 then do
         putStrLn $ prefix ++ " successfully"
         action else T.putStrLn $
-            (T.pack prefix) <> " failed, the server responded: "
+            T.pack prefix <> " failed, the server responded: "
                 <> resp ^. key "msg" . _String

@@ -5,13 +5,14 @@ import Network.WebSockets
 import Data.Aeson
 import Data.Text.IO as TIO
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import qualified Data.ByteString.Char8 as BS
 import qualified Data.Text as T
 import GHC.Generics
 import Control.Lens ((^.))
 import Control.Concurrent
 import Control.Exception
 import System.IO.Error
-import Data.Text.Encoding (encodeUtf8)
+import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Data.Aeson.Lens (key, _String)
 import Data.Monoid
 import System.IO
@@ -121,13 +122,12 @@ pingLoop conn n tid conf = do
 syncLoop :: Connection -> FilePath -> IO ()
 syncLoop conn log = do
     msg <- receiveData conn
-    let msg' = LBS.fromStrict . encodeUtf8 $
-            msg ^. key "msg" . _String
-        msg'' = msg' <> "\n" <> LBS.replicate 80 '-' <> "\n"
+    let msg' = encodeUtf8 $ msg ^. key "msg" . _String
+        msg'' = msg' <> "\n" <> BS.replicate 80 '-' <> "\n"
         Just m = decode msg
         v = object ["jsamsgid" .= String (msgid m), "jsastatus" .= String "ok"]
-    LBS.appendFile log msg''
-    forkIO $ setClipboard $ LBS.unpack msg'
+    BS.appendFile log msg''
+    forkIO $ setClipboard . decodeUtf8 $ msg'
     catch (sendTextData conn (encode v)) handler
     syncLoop conn log where
         handler :: SomeException -> IO ()
