@@ -53,7 +53,7 @@ getSetting conf =
             if ext then do
                 putStrLn "The config file is invalid"
                 error . show $ e else do
-                error . show $ e
+                print e
                 error "Have you run \ESC[1;33m\"init\"\ESC[0m first?"
 
 getConfig :: Maybe FilePath -> IO (FilePath, Configuration)

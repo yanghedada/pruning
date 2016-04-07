@@ -11,6 +11,7 @@ import qualified Data.Text.IO as T
 import Data.Monoid 
 import Types
 import Constant
+import Control.Exception
 
 askForValue :: (Show a, Read a) => String -> a -> IO a
 askForValue prompt def = do
@@ -52,7 +53,12 @@ getTokenFromConfig :: Configuration -> IO Token
 getTokenFromConfig conf = do
     let storedir = conf ^. storeInfoL . storeDirL
         cacheFile = storedir </> cacheFileName
-    snd . cacheToToken <$> T.readFile cacheFile
+    res <- try (snd . cacheToToken <$> T.readFile cacheFile)
+    case res of
+        Left e -> do
+            print (e :: IOException)
+            error "Have you logged in?"
+        Right r -> return r
 
 getCacheFileFromConfig :: Configuration -> FilePath
 getCacheFileFromConfig conf = conf ^. storeInfoL . storeDirL </> cacheFileName
@@ -63,5 +69,11 @@ getLogFileFromConfig conf =
     in conf ^. storeInfoL . storeDirL </> (u <> "_" <> logFileName)
 
 setClipboard :: String -> IO ()
-setClipboard msg = callCommand $ 
-    "echo \"" ++ msg  ++ "\" | xclip -selection clipboard"
+setClipboard msg = do
+    (stdIn, _, _, _) <- 
+        createProcess (shell "xclip -selection clipboard") {std_in = CreatePipe}
+    case stdIn of
+        Just i -> do
+            hPutStr i msg
+            hClose i
+        Nothing -> putStrLn "fail to set clipboard content"

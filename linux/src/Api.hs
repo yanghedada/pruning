@@ -82,7 +82,7 @@ exePost conf tok msg = do
 appSync :: Configuration -> ClientApp ()
 appSync conf conn = do
     tok <- getTokenFromConfig conf
-    TIO.putStrLn tok
+    {-TIO.putStrLn tok-}
     let log = getLogFileFromConfig conf
         v = object ["jstoken" .= tok]
     sendTextData conn (encode v)
@@ -95,7 +95,7 @@ pingLoop conn n tid conf = do
     case result of
         Left (SomeException e) -> do
             killThread tid
-            Prelude.putStrLn "connection issue..., will retry in 1 minutes"
+            Prelude.putStrLn "ping failed..., will retry connection in 1 minutes"
             threadDelay 6000000
             exeSync conf
         Right _ -> do
@@ -105,10 +105,12 @@ pingLoop conn n tid conf = do
 syncLoop :: Connection -> FilePath -> IO ()
 syncLoop conn log = do
     msg <- receiveData conn
-    let msg' = LBS.fromStrict . encodeUtf8 $ msg ^. key "msg" . _String <> "\n"
+    let msg' = LBS.fromStrict . encodeUtf8 $
+            msg ^. key "msg" . _String
+        msg'' = msg' <> "\n" <> LBS.replicate 80 '-' <> "\n"
         Just m = decode msg
         v = object ["jsamsgid" .= String (msgid m), "jsastatus" .= String "ok"]
-    LBS.appendFile log msg'
+    LBS.appendFile log msg''
     forkIO $ setClipboard $ LBS.unpack msg'
     catch (sendTextData conn (encode v)) handler
     syncLoop conn log where
@@ -120,8 +122,8 @@ exeSync conf = do
     let (ip, port, _, _) = getInfo conf
         log = getLogFileFromConfig conf
     catch (runClient ip port "/sync" $ appSync conf) handler where
-        handler :: ConnectionException -> IO ()
+        handler :: SomeException -> IO ()
         handler _ = do
-                TIO.hPutStrLn stderr "establishing connection failed... retry in 60 s"
+                TIO.hPutStrLn stderr "fail to connect... will retry in 1 min"
                 threadDelay 6000000
                 exeSync conf
