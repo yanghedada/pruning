@@ -42,6 +42,9 @@ respondPostMessage = respondRegisterMessage
 respondSyncErrorMessage :: Connection -> Scientific -> Text -> IO ()
 respondSyncErrorMessage = respondRegisterMessage
 
+respondSyncMessage :: Connection -> Scientific -> Text -> IO ()
+respondSyncMessage = respondSyncErrorMessage
+
 appRegister :: Connection -> IO ()
 appRegister conn = do
     jregister <- liftM decode $ receiveData conn
@@ -162,6 +165,7 @@ appSync msgp conn = do
         Just js -> do
             mp <- readMVar msgp
             if jstoken js `HM.member` mp then do
+                respondSyncMessage conn 200 ""
                 sendMessagesOfToken (jstoken js) msgp conn
             else respondSyncErrorMessage conn 422 "no such token"
 

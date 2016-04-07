@@ -152,14 +152,6 @@ sendString conf tok msg = do
     resp <- exePost conf tok (T.pack msg)
     processResp resp "Post" (return ())
 
-processResp :: LBS.ByteString -> String -> IO () -> IO ()
-processResp resp prefix action = do
-    if resp ^?! key "code" . _Number == 200 then do
-        putStrLn $ prefix ++ " successfully"
-        action else T.putStrLn $
-            (T.pack prefix) <> " failed, the server responded: "
-                <> resp ^. key "msg" . _String
-
 statusParser :: Parser StatusOpts
 statusParser = helper <*> configOption
 

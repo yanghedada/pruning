@@ -8,10 +8,12 @@ import Control.Lens
 import System.FilePath.Posix
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
+import qualified Data.ByteString.Lazy as LBS
 import Data.Monoid 
 import Types
 import Constant
 import Control.Exception
+import Data.Aeson.Lens
 
 askForValue :: (Show a, Read a) => String -> a -> IO a
 askForValue prompt def = do
@@ -77,3 +79,11 @@ setClipboard msg = do
             hPutStr i msg
             hClose i
         Nothing -> putStrLn "fail to set clipboard content"
+
+processResp :: LBS.ByteString -> String -> IO () -> IO ()
+processResp resp prefix action = do
+    if resp ^?! key "code" . _Number == 200 then do
+        putStrLn $ prefix ++ " successfully"
+        action else T.putStrLn $
+            (T.pack prefix) <> " failed, the server responded: "
+                <> resp ^. key "msg" . _String

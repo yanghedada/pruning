@@ -15,6 +15,7 @@ import Data.Text.Encoding (encodeUtf8)
 import Data.Aeson.Lens (key, _String)
 import Data.Monoid
 import System.IO
+import System.Timeout
 
 import Types
 import Util
@@ -86,21 +87,36 @@ appSync conf conn = do
     let log = getLogFileFromConfig conf
         v = object ["jstoken" .= tok]
     sendTextData conn (encode v)
-    tid <- forkIO $ syncLoop conn log
-    pingLoop conn 10 tid conf
+    resp <- receiveData conn
+    processResp resp "Sync" $ do
+        tid <- forkIO $ syncLoop conn log
+        pingLoop conn 10 tid conf
+
+appPing :: ClientApp Bool
+appPing conn = do
+    sendTextData conn ("ping" :: T.Text)
+    result <- timeout 4000000 $ receiveData conn
+    case result of
+        Nothing -> return False
+        Just t -> if t == ("ping" :: T.Text) then return True else
+                    error "this is really a big surprise!!!"
+
+exePing :: Configuration -> IO Bool
+exePing conf = do
+    let (ip, port, _, _) = getInfo conf
+    runClient  ip port "/ping" $ appPing
 
 pingLoop :: Connection -> Int -> ThreadId -> Configuration -> IO ()
 pingLoop conn n tid conf = do
-    result <- try $ sendPing conn ("ping"::LBS.ByteString)
-    case result of
-        Left (SomeException e) -> do
+    b <- exePing conf
+    if b then do
+            threadDelay (n * 1000000) -- default 5 min
+            pingLoop conn n tid conf
+        else do
             killThread tid
             Prelude.putStrLn "ping failed..., will retry connection in 1 minutes"
             threadDelay 6000000
             exeSync conf
-        Right _ -> do
-            threadDelay (n * 1000000) -- default 5 min
-            pingLoop conn n tid conf
 
 syncLoop :: Connection -> FilePath -> IO ()
 syncLoop conn log = do
@@ -115,7 +131,8 @@ syncLoop conn log = do
     catch (sendTextData conn (encode v)) handler
     syncLoop conn log where
         handler :: SomeException -> IO ()
-        handler _ = error "this should be very very rare, what happened???"
+        handler e = print e >> error "this should be very very rare, \
+        \ and I have no clue what happened. You are on your own, sir"
 
 exeSync :: Configuration -> IO ()
 exeSync conf = do
