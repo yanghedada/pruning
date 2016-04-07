@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 ExecStop=/usr/bin/killall cliper
-ExecStart=/usr/bin/cliper daemon -c /home/adv_zxy/.cliper.yaml
+ExecStart=/usr/bin/cliper daemon -c /home/${USER}/.cliper.yaml
 
 [Install]
 WantedBy=default.target

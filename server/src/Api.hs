@@ -4,7 +4,7 @@ module Api where
 import Control.Monad
 import Network.WebSockets
 import Data.Aeson
-import Data.Text (Text)
+import Data.Text as T (Text, null) 
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Database.Persist
 import Database.Persist.Sqlite hiding (Connection)
@@ -51,14 +51,18 @@ appRegister conn = do
 
 performRegisterAction :: Connection -> JRegister -> IO ()
 performRegisterAction conn jr =
-    catch (do
-        runSqlite sqlTable $ insert $ User u p key
-        respondRegisterMessage conn 200 "") handler where
-            u = jrusername jr
-            p = jrpassword jr
-            key = generateAesKey u p
-            handler (SomeException _) =
-                respondRegisterMessage conn 422 sqlErrorStr
+    catch (
+        if T.null u then respondRegisterMessage conn 422 "username cannot be empty" 
+        else do
+            runSqlite sqlTable $ insert $ User u p key
+            respondRegisterMessage conn 200 "") handler where
+                u = jrusername jr
+                p = jrpassword jr
+                key = generateAesKey u p
+                handler (SomeException _) =
+                    respondRegisterMessage conn 422
+                        "exception during database operation, probably because the\
+                        \ username has been taken"
 
 appLogin :: MVar MessagePool -> Connection -> IO ()
 appLogin msgp conn = do
@@ -76,7 +80,7 @@ performLoginAction conn jl msgp = do
             tok <- genRandomToken
             b <- insertTokenDb tok uid msgp
             mp <- readMVar msgp
-            print mp
+            {-print mp-}
             if b then respondLoginMessage conn 200 "" tok else
                         respondLoginMessage conn 422 sqlErrorStr ""
         Nothing -> respondLoginMessage conn 422 "username / password mismatch" ""
@@ -169,7 +173,7 @@ sendMessagesOfToken token msgp conn = do
     case msgs' of
         Nothing -> return ()
         Just msgs ->
-            if null msgs then do
+            if L.null msgs then do
                 threadDelay 500000
                 sendMessagesOfToken token msgp conn
             else do
