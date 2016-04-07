@@ -33,6 +33,9 @@ app mp pend = do
         "/sync" -> do
             conn <- acceptRequest pend
             appSync mp conn
+        "/ping" -> do
+            conn <- acceptRequest pend
+            appPing conn
         _ -> rejectRequest pend ""
 
 main :: IO ()

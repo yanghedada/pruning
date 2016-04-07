@@ -162,9 +162,11 @@ appSync msgp conn = do
         Just js -> do
             mp <- readMVar msgp
             if jstoken js `HM.member` mp then do
-                forkIO $ keepAlive conn
                 sendMessagesOfToken (jstoken js) msgp conn
             else respondSyncErrorMessage conn 422 "no such token"
+
+appPing :: Connection -> IO ()
+appPing = keepAlive
 
 keepAlive :: Connection -> IO ()
 keepAlive conn = do
