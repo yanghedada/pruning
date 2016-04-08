@@ -10,10 +10,12 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.ByteString.Lazy as LBS
 import Data.Monoid 
-import Types
-import Constant
 import Control.Exception
 import Data.Aeson.Lens
+import Control.Monad
+
+import Types
+import Constant
 
 askForValue :: (Show a, Read a) => String -> a -> IO a
 askForValue prompt def = do
@@ -72,12 +74,13 @@ getLogFileFromConfig conf =
 
 setClipboard :: T.Text -> IO ()
 setClipboard msg = do
-    (stdIn, _, _, _) <- 
+    (stdIn, _, _, h) <-
         createProcess (shell "xclip -selection clipboard") {std_in = CreatePipe}
     case stdIn of
         Just i -> do
             T.hPutStr i msg
             hClose i
+            void $ waitForProcess h
         Nothing -> putStrLn "fail to set clipboard content"
 
 processResp :: LBS.ByteString -> String -> IO () -> IO ()
