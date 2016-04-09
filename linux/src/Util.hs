@@ -13,6 +13,7 @@ import Data.Monoid
 import Control.Exception
 import Data.Aeson.Lens
 import Control.Monad
+import System.Exit
 
 import Types
 import Constant
@@ -57,12 +58,9 @@ getTokenFromConfig :: Configuration -> IO Token
 getTokenFromConfig conf = do
     let storedir = conf ^. storeInfoL . storeDirL
         cacheFile = storedir </> cacheFileName
-    res <- try (snd . cacheToToken <$> T.readFile cacheFile)
-    case res of
-        Left e -> do
-            print (e :: IOException)
-            error "Have you logged in?"
-        Right r -> return r
+    catch (snd . cacheToToken <$> T.readFile cacheFile) handler where
+    handler :: IOException -> IO Token
+    handler e = print e >> error "have you logined in?"
 
 getCacheFileFromConfig :: Configuration -> FilePath
 getCacheFileFromConfig conf = conf ^. storeInfoL . storeDirL </> cacheFileName

@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns #-}
 module OptParse where
 
 import Data.Typeable
@@ -15,7 +16,7 @@ import qualified Data.Text.IO as T
 import Control.Lens
 import Data.Aeson.Lens
 import Control.Exception
-import System.IO.Error (isDoesNotExistError)
+import System.IO.Error
 
 import Constant
 import Util
@@ -67,7 +68,7 @@ getConfig conf = do
 registerParser :: Parser RegisterOpts
 registerParser = helper <*> ((,) <$> username <*> configfile) where
     username = optional $ strArgument (metavar "USERNAME")
-    configfile = configOption 
+    configfile = configOption
 
 getRegPassword :: IO String
 getRegPassword = do
@@ -149,7 +150,8 @@ sendFile conf token fp = readFile fp >>= sendString conf token
 
 sendString :: Configuration -> Token -> String -> IO ()
 sendString conf tok msg = do
-    resp <- exePost conf tok (T.pack msg)
+    let !t = T.pack msg
+    resp <- exePost conf tok t
     processResp resp "Post" (return ())
 
 statusParser :: Parser StatusOpts
@@ -168,5 +170,6 @@ daemonParser = helper <*> configOption
 daemonCmd :: DaemonOpts -> IO ()
 daemonCmd c = do
     (_, config) <- getConfig c
+    _ <- getTokenFromConfig config -- tried to query token before even connect
     exeSync config
 

@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Types where
 
@@ -6,6 +7,8 @@ import GHC.Generics
 import Data.Yaml
 import Control.Lens
 import Data.Text (Text)
+import Control.Exception
+import Data.Typeable
 
 import Lens
 
@@ -57,3 +60,8 @@ type StatusOpts = Maybe ConfigFile
 type DaemonOpts = Maybe ConfigFile
 
 type Token = Text
+
+data CliperException =  ConnectionError
+    deriving (Typeable, Show)
+
+instance Exception CliperException

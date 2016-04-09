@@ -91,6 +91,7 @@ appSync conf conn = do
     resp <- receiveData conn
     processResp resp "Sync" $ do
         tid <- forkIO $ syncLoop conn log
+        forkPingThread conn 240
         pingLoop conn 10 tid conf
 
 appPing :: ClientApp Bool
@@ -100,7 +101,7 @@ appPing conn = do
     case result of
         Nothing -> return False
         Just t -> if t == ("ping" :: T.Text) then return True else
-                    error "this is really a big surprise!!!"
+                    error "this is really a big surprise!!! BUG AGAIN!"
 
 exePing :: Configuration -> IO Bool
 exePing conf = do
@@ -140,7 +141,7 @@ exeSync conf = do
         log = getLogFileFromConfig conf
     catch (runClient ip port "/sync" $ appSync conf) handler where
         handler :: SomeException -> IO ()
-        handler _ = do
+        handler e = do
                 TIO.hPutStrLn stderr "fail to connect... will retry in 1 min"
                 threadDelay 6000000
                 exeSync conf
