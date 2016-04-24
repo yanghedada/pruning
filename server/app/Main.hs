@@ -14,29 +14,33 @@ import Api
 import Database
 import Constant
 import Types
+import Logger
 
 app :: MVar MessagePool -> ServerApp
-app mp pend = do
-    case (requestPath $ pendingRequest pend) of
+app mp pend =
+    case requestPath $ pendingRequest pend of
         "/register" -> do
-            conn <- acceptRequest pend
+            conn <- acceptRequest' pend
             appRegister conn
         "/login" -> do
-            conn <- acceptRequest pend
+            conn <- acceptRequest' pend
             appLogin mp conn
         "/post" -> do
-            conn <- acceptRequest pend
+            conn <- acceptRequest' pend
             appPost mp conn
         "/logout" -> do
-            conn <- acceptRequest pend
+            conn <- acceptRequest' pend
             appLogout mp conn
         "/sync" -> do
-            conn <- acceptRequest pend
+            conn <- acceptRequest' pend
             appSync mp conn
         "/ping" -> do
-            conn <- acceptRequest pend
+            conn <- acceptRequest' pend
             appPing conn
-        _ -> rejectRequest pend ""
+        _ -> logNoUrl pend >> rejectRequest pend ""
+
+acceptRequest' :: PendingConnection -> IO Network.WebSockets.Connection
+acceptRequest' pend = logAcceptConn pend >> acceptRequest pend
 
 main :: IO ()
 main = do

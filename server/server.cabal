@@ -21,6 +21,7 @@ library
                      , JSON
                      , Types
                      , Constant
+                     , Logger
   build-depends:       base >= 4.7 && < 5
                      , text
                      , bytestring

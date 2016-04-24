@@ -1,9 +1,12 @@
 import Options.Applicative.Simple
+import System.IO
 
 import OptParse
 
 main :: IO ()
 main = do
+    hSetBuffering stdout NoBuffering
+    hSetBuffering stderr NoBuffering
     (opts,runCmd) <-
         simpleOptions "Version 0.1.0.0"
                       "cliper - Cliper Tool client executable"

@@ -22,6 +22,7 @@ import JSON
 import Database
 import Constant
 import Types
+import Logger
 
 respondRegisterMessage :: Connection -> Scientific -> Text -> IO ()
 respondRegisterMessage conn code msg = sendTextData conn (encode obj) where
@@ -47,10 +48,12 @@ respondSyncMessage = respondSyncErrorMessage
 
 appRegister :: Connection -> IO ()
 appRegister conn = do
-    jregister <- liftM decode $ receiveData conn
+    d <- receiveData conn
+    let jregister = decode d
     case jregister of
         Just jr -> performRegisterAction conn jr
-        Nothing -> respondRegisterMessage conn 400 "bad request"
+        Nothing -> logInvalidJson d >>
+                respondRegisterMessage conn 400 "bad request"
 
 performRegisterAction :: Connection -> JRegister -> IO ()
 performRegisterAction conn jr =
@@ -69,10 +72,12 @@ performRegisterAction conn jr =
 
 appLogin :: MVar MessagePool -> Connection -> IO ()
 appLogin msgp conn = do
-    jlogin <- liftM decode $ receiveData conn
+    d <- receiveData conn
+    let jlogin = decode d
     case jlogin of
         Just jl -> performLoginAction conn jl msgp
-        Nothing -> respondLoginMessage conn 400 "bad request" ""
+        Nothing -> logInvalidJson d >>
+                respondLoginMessage conn 400 "bad request" ""
 
 performLoginAction :: Connection -> JLogin -> MVar MessagePool -> IO ()
 performLoginAction conn jl msgp = do
@@ -104,10 +109,12 @@ insertTokenDb tok uid msgp =
 
 appPost :: MVar MessagePool -> Connection -> IO ()
 appPost msgPool conn = do
-    jpost <- liftM decode $ receiveData conn
+    d <- receiveData conn
+    let jpost = decode d
     case jpost of
         Just jp -> performPostAction conn jp msgPool
-        Nothing -> respondPostMessage conn 400 "bad request"
+        Nothing -> logInvalidJson d >>
+            respondPostMessage conn 400 "bad request"
 
 performPostAction :: Connection -> JPost -> MVar MessagePool -> IO ()
 performPostAction conn jp msgp = do
@@ -129,10 +136,12 @@ addMessageToToken uid token msg msgp = do
 
 appLogout :: MVar MessagePool -> Connection -> IO ()
 appLogout msgp conn = do
-    jlogout <- liftM decode $ receiveData conn
+    d <- receiveData conn
+    let jlogout = decode d
     case jlogout of
         Just jl -> performLogoutAction conn jl msgp
-        Nothing -> respondLogoutMessage conn 400 "bad request"
+        Nothing -> logInvalidJson d >>
+            respondLogoutMessage conn 400 "bad request"
 
 performLogoutAction :: Connection -> JLogout -> MVar MessagePool -> IO ()
 performLogoutAction conn jl msgp = do
@@ -159,9 +168,11 @@ deleteTokenDb tok uid msgp =
 
 appSync :: MVar MessagePool -> Connection -> IO ()
 appSync msgp conn = do
-    jsync <- liftM decode $ receiveData conn
+    d <- receiveData conn
+    let jsync = decode d
     case jsync of
-        Nothing -> respondSyncErrorMessage conn 400 "bad request"
+        Nothing -> logInvalidJson d >>
+            respondSyncErrorMessage conn 400 "bad request"
         Just js -> do
             mp <- readMVar msgp
             if jstoken js `HM.member` mp then do
@@ -192,14 +203,16 @@ sendMessagesOfToken token msgp conn = do
             let obj = object [ "msg" .= String (head msgs),
                                 "msgid" .= String msgid ]
             sendTextData conn (encode obj)
-            jsa' <- timeout 3000000 $ liftM decode $ receiveData conn
+            d <- timeout 3000000 $ receiveData conn
+            let jsa' = decode <$> d
             case jsa' of
                 Just (Just jsa) ->
                     if jsamsgid jsa == msgid && jsastatus jsa == "ok" then do
                         modifyMVar_ msgp (return . HM.adjust tail token)
                         sendMessagesOfToken token msgp conn else
                             sendMessagesOfToken token msgp conn
-                Just Nothing -> respondSyncErrorMessage conn 400
-                    "you don't know how to respond to my message!"
+                Just Nothing -> logInvalidJson (fromJust d) >>
+                                respondSyncErrorMessage conn 400
+                                "you don't know how to respond to my message!"
                 Nothing -> return ()
 

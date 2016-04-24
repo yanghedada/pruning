@@ -40,7 +40,7 @@ appRegister :: T.Text -> T.Text -> ClientApp LBS.ByteString
 appRegister u p conn = do
     sendTextData conn (encode v)
     receiveData conn where
-        v = object ["jrusername" .= String u, "jrpassword" .= String p]
+        v = object ["username" .= String u, "password" .= String p]
 
 exeRegister :: Configuration -> T.Text -> IO LBS.ByteString
 exeRegister conf p = do
@@ -51,8 +51,8 @@ appLogin :: T.Text -> T.Text -> T.Text -> ClientApp LBS.ByteString
 appLogin u p d conn = do
     sendTextData conn (encode v)
     receiveData conn where
-        v = object ["jlusername" .= String u, "jlpassword" .= String p,
-                    "jldeviceName" .= String d]
+        v = object ["username" .= String u, "password" .= String p,
+                    "deviceName" .= String d]
 
 exeLogin :: Configuration -> T.Text -> IO LBS.ByteString
 exeLogin conf p = do
@@ -63,7 +63,7 @@ appLogout :: Token -> ClientApp LBS.ByteString
 appLogout tok conn = do
     sendTextData conn (encode v)
     receiveData conn where
-        v = object ["jltoken" .= String tok]
+        v = object ["token" .= String tok]
 
 exeLogout :: Configuration -> Token -> IO LBS.ByteString
 exeLogout conf tok = do
@@ -74,7 +74,7 @@ appPost :: Token -> T.Text -> ClientApp LBS.ByteString
 appPost tok msg conn = do
     sendTextData conn (encode v)
     receiveData conn where
-        v = object ["jptoken" .= tok, "jpdata" .= msg]
+        v = object ["token" .= tok, "data" .= msg]
 
 exePost :: Configuration -> Token -> T.Text -> IO LBS.ByteString
 exePost conf tok msg = do
@@ -86,7 +86,7 @@ appSync conf conn = do
     tok <- getTokenFromConfig conf
     {-TIO.putStrLn tok-}
     let log = getLogFileFromConfig conf
-        v = object ["jstoken" .= tok]
+        v = object ["token" .= tok]
     sendTextData conn (encode v)
     resp <- receiveData conn
     processResp resp "Sync" $ do
@@ -126,7 +126,7 @@ syncLoop conn log = do
     let msg' = encodeUtf8 $ msg ^. key "msg" . _String
         msg'' = msg' <> "\n" <> BS.replicate 80 '-' <> "\n"
         Just m = decode msg
-        v = object ["jsamsgid" .= String (msgid m), "jsastatus" .= String "ok"]
+        v = object ["msgid" .= String (msgid m), "status" .= String "ok"]
     BS.appendFile log msg''
     forkIO $ setClipboard . decodeUtf8 $ msg'
     catch (sendTextData conn (encode v)) handler
