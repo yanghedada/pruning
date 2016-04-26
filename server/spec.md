@@ -51,7 +51,7 @@ client:
 	{
 		"username": "theusername(RSA)",
 		"password": "md5'ed password(RSA)",
-		"devicename": "Nexus, Huawei, Xiaomi, Chromium...(RSA)"
+		"deviceName": "Nexus, Huawei, Xiaomi, Chromium...(RSA)"
 	}
 ```
 server: autheticate by querying database, return
