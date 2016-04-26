@@ -1,8 +1,18 @@
 ## Database
-- uid		Integer
-- username	string
-- md5password	hex string
-- key		hex string, used for AES encryption (generated from username/pwd)
+
+- user
+	- uid		Integer
+	- username	string
+	- md5password	hex string
+	- key		hex string, used for AES encryption (generated from username/pwd)
+
+- token_map
+	- token		hex string, used for uniquely identify client
+	- uid		Integer, user id
+
+- id_map
+	- uid		Integer, user id
+	- [token]	hex string, same meaning as above
 
 ## API
 --------------------------------------------------------------------------------
@@ -58,8 +68,8 @@ server: autheticate by querying database, return
 ```json
 	{
 		"code": "200",
-		"token": "aes encrypted token(possibly base64'ed)"
-		"msg": "empty"
+		"token": "aes encrypted token(possibly base64'ed)",
+		"msg": ""
 	}
 ```
 on success,
@@ -99,7 +109,7 @@ server: server add data to message queue which is to be send
 		"code": "200",
 		"msg": ""
 	}
-
+```
 on success or
 ```json
 	{
@@ -122,11 +132,11 @@ client:
 	}
 ```
 server: when there's new message, send that to client
-```
+```json
 	{
 		"msg": "aes encrypted message, (AES and base64)",
 		"msgid": "a number indicating the msg id, (AES and base64)",
-		(optional)"time": "message time, (maybe added later)"
+		"(optional)time": "message time, (maybe added later)"
 	}
 ```
 then, if the client received the message, send an ACK:
@@ -156,7 +166,7 @@ connect back, then send the remaining message.
 client:
 ```json
 	{
-		"token": "previously gotten token (RSA)"
+		"token": "previously gotten token (RSA)",
 		"(optional)reason": "reason, (maybe added later)"
 	}
 ```
@@ -167,7 +177,7 @@ server:
 		"code": "200"
 	} on success or
 	{
-		"code": "400"
+		"code": "400",
 		"msg": "bad request"
 	}
 ```
@@ -176,9 +186,25 @@ all the message related to that token.
 
 --------------------------------------------------------------------------------
 
+### PING
+
+(server respond as soon as possible)
+
+**/ping**
+
+client:
+```
+anything
+```
+then server send back the same thing.
+server:
+```
+anything
+```
+
+--------------------------------------------------------------------------------
+
 ## datatypes
-- `Map token uid`
-- `Map uid [tokens]`
 - `Map token MessageQueue` -> memory as MVar
 
 so when the server restart, all messages lost, but tokens is restored

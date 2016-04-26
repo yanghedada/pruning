@@ -3,10 +3,32 @@
 <a id="user-content-database" class="anchor" href="#database" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Database</h2>
 
 <ul>
+<li>
+<p>user</p>
+
+<ul>
 <li>uid       Integer</li>
 <li>username  string</li>
 <li>md5password   hex string</li>
 <li>key       hex string, used for AES encryption (generated from username/pwd)</li>
+</ul>
+</li>
+<li>
+<p>token_map</p>
+
+<ul>
+<li>token     hex string, used for uniquely identify client</li>
+<li>uid       Integer, user id</li>
+</ul>
+</li>
+<li>
+<p>id_map</p>
+
+<ul>
+<li>uid       Integer, user id</li>
+<li>[token]   hex string, same meaning as above</li>
+</ul>
+</li>
 </ul>
 
 <h2>
@@ -59,15 +81,15 @@ token is generated from username and password. and respond.</p>
 <div class="highlight highlight-source-json"><pre>    {
         <span class="pl-s"><span class="pl-pds">"</span>username<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>theusername(RSA)<span class="pl-pds">"</span></span>,
         <span class="pl-s"><span class="pl-pds">"</span>password<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>md5'ed password(RSA)<span class="pl-pds">"</span></span>,
-        <span class="pl-s"><span class="pl-pds">"</span>devicename<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>Nexus, Huawei, Xiaomi, Chromium...(RSA)<span class="pl-pds">"</span></span>
+        <span class="pl-s"><span class="pl-pds">"</span>deviceName<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>Nexus, Huawei, Xiaomi, Chromium...(RSA)<span class="pl-pds">"</span></span>
     }</pre></div>
 
 <p>server: autheticate by querying database, return</p>
 
 <div class="highlight highlight-source-json"><pre>    {
         <span class="pl-s"><span class="pl-pds">"</span>code<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>200<span class="pl-pds">"</span></span>,
-        <span class="pl-s"><span class="pl-pds">"</span>token<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>aes encrypted token(possibly base64'ed)<span class="pl-pds">"</span></span>
-        <span class="pl-s"><span class="pl-pds">"</span>msg<span class="pl-pds">"</span></span><span class="pl-ii">:</span> <span class="pl-s"><span class="pl-pds">"</span>empty<span class="pl-pds">"</span></span>
+        <span class="pl-s"><span class="pl-pds">"</span>token<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>aes encrypted token(possibly base64'ed)<span class="pl-pds">"</span></span>,
+        <span class="pl-s"><span class="pl-pds">"</span>msg<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span><span class="pl-pds">"</span></span>
     }</pre></div>
 
 <p>on success,</p>
@@ -107,11 +129,11 @@ with server afterwards.</p>
 <div class="highlight highlight-source-json"><pre>    {
         <span class="pl-s"><span class="pl-pds">"</span>code<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>200<span class="pl-pds">"</span></span>,
         <span class="pl-s"><span class="pl-pds">"</span>msg<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span><span class="pl-pds">"</span></span>
-    }
+    }</pre></div>
 
-on success or
-```json
-    {
+<p>on success or</p>
+
+<div class="highlight highlight-source-json"><pre>    {
         <span class="pl-s"><span class="pl-pds">"</span>code<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>400<span class="pl-pds">"</span></span>,
         <span class="pl-s"><span class="pl-pds">"</span>msg<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>bad request, etc<span class="pl-pds">"</span></span>
     }</pre></div>
@@ -133,12 +155,11 @@ on success or
 
 <p>server: when there's new message, send that to client</p>
 
-<pre><code>    {
-        "msg": "aes encrypted message, (AES and base64)",
-        "msgid": "a number indicating the msg id, (AES and base64)",
-        (optional)"time": "message time, (maybe added later)"
-    }
-</code></pre>
+<div class="highlight highlight-source-json"><pre>    {
+        <span class="pl-s"><span class="pl-pds">"</span>msg<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>aes encrypted message, (AES and base64)<span class="pl-pds">"</span></span>,
+        <span class="pl-s"><span class="pl-pds">"</span>msgid<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>a number indicating the msg id, (AES and base64)<span class="pl-pds">"</span></span>,
+        <span class="pl-s"><span class="pl-pds">"</span>(optional)time<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>message time, (maybe added later)<span class="pl-pds">"</span></span>
+    }</pre></div>
 
 <p>then, if the client received the message, send an ACK:
 client:</p>
@@ -168,8 +189,8 @@ connect back, then send the remaining message.</p>
 <p>client:</p>
 
 <div class="highlight highlight-source-json"><pre>    {
-        <span class="pl-s"><span class="pl-pds">"</span>token<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>previously gotten token (RSA)<span class="pl-pds">"</span></span>
-        <span class="pl-s"><span class="pl-pds">"</span>(optional)reason<span class="pl-pds">"</span></span><span class="pl-ii">:</span> <span class="pl-s"><span class="pl-pds">"</span>reason, (maybe added later)<span class="pl-pds">"</span></span>
+        <span class="pl-s"><span class="pl-pds">"</span>token<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>previously gotten token (RSA)<span class="pl-pds">"</span></span>,
+        <span class="pl-s"><span class="pl-pds">"</span>(optional)reason<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>reason, (maybe added later)<span class="pl-pds">"</span></span>
     }</pre></div>
 
 <p>then server send back an ack.
@@ -179,8 +200,8 @@ server:</p>
         <span class="pl-s"><span class="pl-pds">"</span>code<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>200<span class="pl-pds">"</span></span>
     } on success or
     {
-        <span class="pl-s"><span class="pl-pds">"</span>code<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>400<span class="pl-pds">"</span></span>
-        <span class="pl-s"><span class="pl-pds">"</span>msg<span class="pl-pds">"</span></span><span class="pl-ii">:</span> <span class="pl-s"><span class="pl-pds">"</span>bad request<span class="pl-pds">"</span></span>
+        <span class="pl-s"><span class="pl-pds">"</span>code<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>400<span class="pl-pds">"</span></span>,
+        <span class="pl-s"><span class="pl-pds">"</span>msg<span class="pl-pds">"</span></span>: <span class="pl-s"><span class="pl-pds">"</span>bad request<span class="pl-pds">"</span></span>
     }</pre></div>
 
 <p>when bad formatted json or no such token then the server clears 
@@ -188,12 +209,30 @@ all the message related to that token.</p>
 
 <hr>
 
+<h3>
+<a id="user-content-ping" class="anchor" href="#ping" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>PING</h3>
+
+<p>(server respond as soon as possible)</p>
+
+<p><strong>/ping</strong></p>
+
+<p>client:</p>
+
+<pre><code>anything
+</code></pre>
+
+<p>then server send back the same thing.
+server:</p>
+
+<pre><code>anything
+</code></pre>
+
+<hr>
+
 <h2>
 <a id="user-content-datatypes" class="anchor" href="#datatypes" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>datatypes</h2>
 
 <ul>
-<li><code>Map token uid</code></li>
-<li><code>Map uid [tokens]</code></li>
 <li>
 <code>Map token MessageQueue</code> -&gt; memory as MVar</li>
 </ul>
