@@ -58,7 +58,8 @@ appRegister conn = do
 performRegisterAction :: Connection -> JRegister -> IO ()
 performRegisterAction conn jr =
     catch (
-        if T.null u then respondRegisterMessage conn 422 "username cannot be empty" 
+        if T.null u || T.null p then 
+            respondRegisterMessage conn 422 "username/password cannot be empty"
         else do
             runSqlite sqlTable $ insert $ User u p key
             respondRegisterMessage conn 200 "") handler where

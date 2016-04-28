@@ -21,4 +21,4 @@ After you have successfully installed `stack`, run the following commands:
 ```
 
 # TODO
-- reject register with empty password (and possibly invalid username)
+- create a simple web interface on server side
