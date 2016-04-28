@@ -214,5 +214,6 @@ sendMessagesOfToken token msgp conn = do
                 Just Nothing -> logInvalidJson (fromJust d) >>
                                 respondSyncErrorMessage conn 400
                                 "you don't know how to respond to my message!"
-                Nothing -> return ()
+                Nothing -> respondSyncErrorMessage conn 400
+                                "you don't even know you should respond to my message!"
 
