@@ -140,6 +140,7 @@ server: when there's new message, send that to client
 	}
 ```
 then, if the client received the message, send an ACK:
+
 client:
 ```json
 	{
@@ -171,11 +172,15 @@ client:
 	}
 ```
 then server send back an ack.
+
 server:
 ```json
 	{
 		"code": "200"
-	} on success or
+	}
+```
+on success or
+```json
 	{
 		"code": "400",
 		"msg": "bad request"
