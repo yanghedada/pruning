@@ -97,7 +97,7 @@ appSync conf conn = do
 appPing :: ClientApp Bool
 appPing conn = do
     sendTextData conn ("ping" :: T.Text)
-    result <- timeout 4000000 $ receiveData conn
+    result <- timeout 5000000 $ receiveData conn
     case result of
         Nothing -> return False
         Just t -> if t == ("ping" :: T.Text) then return True else
@@ -112,12 +112,12 @@ pingLoop :: Connection -> Int -> ThreadId -> Configuration -> IO ()
 pingLoop conn n tid conf = do
     b <- exePing conf
     if b then do
-            threadDelay (n * 1000000) -- default 5 min
+            threadDelay (n * 1000000) -- default 4 min
             pingLoop conn n tid conf
-        else do
+        else do -- this never executed since exception is caught by outer "exeSync"
             killThread tid
             Prelude.putStrLn "ping failed..., will retry connection in 1 minutes"
-            threadDelay 6000000
+            threadDelay 60000000
             exeSync conf
 
 syncLoop :: Connection -> FilePath -> IO ()
@@ -143,5 +143,5 @@ exeSync conf = do
         handler :: SomeException -> IO ()
         handler e = do
                 TIO.hPutStrLn stderr "fail to connect... will retry in 1 min"
-                threadDelay 6000000
+                threadDelay 60000000
                 exeSync conf

@@ -178,6 +178,7 @@ appSync msgp conn = do
             mp <- readMVar msgp
             if jstoken js `HM.member` mp then do
                 respondSyncMessage conn 200 ""
+                forkPingThread conn 30
                 sendMessagesOfToken (jstoken js) msgp conn
             else respondSyncErrorMessage conn 422 "no such token"
 
