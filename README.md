@@ -6,6 +6,8 @@ The server supports the following [api](server/spec.md).
 # Install
 
 ### Android
+[![android build status](https://travis-ci.org/Frefreak/fluffy-dollop.svg)](https://travis-ci.org/Frefreak/fluffy-dollop)
+
 In folder **android**. This is an **android-studio** project. Api 23 or above.
 
 ### Server & Linux

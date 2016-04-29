@@ -1,11 +1,14 @@
 language: android
-jdk: openjdk8
+
 android:
     components:
         - platform-tools
         - tools
         - build-tools-23.0.3
         - android-23
+        - extra-google-m2repository
+        - extra-android-m2repository
+        - extra-android-support
 
-before_script:
-    - cd android && bash gradlew assembleRelease
+script:
+    - cd android && ./gradlew assembleRelease
