@@ -92,7 +92,7 @@ appSync conf conn = do
     processResp resp "Sync" $ do
         tid <- forkIO $ syncLoop conn log
         forkPingThread conn 240
-        pingLoop conn 10 tid conf
+        pingLoop conn 240 tid conf
 
 appPing :: ClientApp Bool
 appPing conn = do

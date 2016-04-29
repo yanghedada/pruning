@@ -20,7 +20,7 @@ configFile :: FilePath
 configFile =  unsafePerformIO $ (</> configFile') <$> getHomeDirectory
 
 defaultServerIP :: String
-defaultServerIP = "162.211.226.148"
+defaultServerIP = "104.207.144.233"
 
 defaultServerPort :: Int
 defaultServerPort = 4564
