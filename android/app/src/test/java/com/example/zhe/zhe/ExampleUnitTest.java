@@ -1,4 +1,4 @@
-package com.example.administrator.myapplication;
+package com.example.zhe.zhe;
 
 import org.junit.Test;
 
