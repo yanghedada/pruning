@@ -35,6 +35,7 @@ library
                      , process
                      , template-haskell
                      , random
+                     , async
   default-language:    Haskell2010
 
 executable cliper

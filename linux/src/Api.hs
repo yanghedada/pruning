@@ -11,12 +11,14 @@ import GHC.Generics
 import Control.Lens ((^.))
 import Control.Concurrent
 import Control.Exception
+import Control.Monad
 import System.IO.Error
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Data.Aeson.Lens (key, _String)
 import Data.Monoid
 import System.IO
 import System.Timeout
+import Control.Concurrent.Async
 
 import Types
 import Util
@@ -34,7 +36,7 @@ getInfo :: Configuration -> (String, Int, T.Text, T.Text)
 getInfo conf = (conf ^. serverInfoL . serverIPL,
                 conf ^. serverInfoL . serverPortL,
                 T.pack $ conf ^. userInfoL . usernameL,
-                T.pack $ conf ^. userInfoL . usernameL)
+                T.pack $ conf ^. userInfoL . devicenameL)
 
 appRegister :: T.Text -> T.Text -> ClientApp LBS.ByteString
 appRegister u p conn = do
@@ -89,10 +91,9 @@ appSync conf conn = do
         v = object ["token" .= tok]
     sendTextData conn (encode v)
     resp <- receiveData conn
-    processResp resp "Sync" $ do
-        tid <- forkIO $ syncLoop conn log
-        forkPingThread conn 240
-        pingLoop conn 240 tid conf
+    processResp resp "Sync" $ void $
+        -- forkPingThread conn 240 -- server will send ping frame
+        concurrently (syncLoop conn log) (pingLoop conn 240 conf)
 
 appPing :: ClientApp Bool
 appPing conn = do
@@ -108,17 +109,12 @@ exePing conf = do
     let (ip, port, _, _) = getInfo conf
     runClient  ip port "/ping" $ appPing
 
-pingLoop :: Connection -> Int -> ThreadId -> Configuration -> IO ()
-pingLoop conn n tid conf = do
+pingLoop :: Connection -> Int -> Configuration -> IO ()
+pingLoop conn n conf = do
     b <- exePing conf
-    if b then do
+    when b $ do
             threadDelay (n * 1000000) -- default 4 min
-            pingLoop conn n tid conf
-        else do -- this never executed since exception is caught by outer "exeSync"
-            killThread tid
-            Prelude.putStrLn "ping failed..., will retry connection in 1 minutes"
-            threadDelay 60000000
-            exeSync conf
+            pingLoop conn n conf
 
 syncLoop :: Connection -> FilePath -> IO ()
 syncLoop conn log = do
