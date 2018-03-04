@@ -3,6 +3,10 @@ package zhe.zhe;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.annotation.TargetApi;
+<<<<<<< HEAD
+=======
+import android.content.Intent;
+>>>>>>> a176d4c81cfa0d078d2ad8916944b1fdc87e4468
 import android.content.pm.PackageManager;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
@@ -204,7 +208,11 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
     }
 
     private boolean isEmailValid(String email) {
+<<<<<<< HEAD
         //TODO: Replace this with your own logic
+=======
+        //TODO: Replace this with your own logi
+>>>>>>> a176d4c81cfa0d078d2ad8916944b1fdc87e4468
         return email.contains("@");
     }
 
@@ -346,7 +354,13 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
             showProgress(false);
 
             if (success) {
+<<<<<<< HEAD
                 finish();
+=======
+//                finish();
+                Intent i = new Intent(getApplicationContext(), zhe.zhe.RegisterActivity.class);
+                startActivity(i);
+>>>>>>> a176d4c81cfa0d078d2ad8916944b1fdc87e4468
             } else {
                 mPasswordView.setError(getString(R.string.error_incorrect_password));
                 mPasswordView.requestFocus();
